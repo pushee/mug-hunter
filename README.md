@@ -17,6 +17,6 @@ A simple script that applies some extra filters/info in the torn advanced users 
 1. Install script
 2. Open script running extension (tampermonkey, greasemonkey etc)
 3. Edit the mug hunter script
-4. At the top of the script, replace YOUR_API_KEY_HERE with your actual API key
+4. At the top of the script, replace `YOUR_API_KEY_HERE` with your actual API key
 5. Save the script
 6. Get muggin'
