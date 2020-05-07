@@ -2,7 +2,7 @@
 Tampermonkey script to assist in finding mug targers
 
 # About
-A simple script that applies some extra filters/info in the torn advanced user search.
+A simple script that applies some extra filters/info in the torn advanced users search.
 
 # Features
 - Filter by job (shows only surgeons, principals and federal judges)
