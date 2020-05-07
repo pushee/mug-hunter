@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Mug hunter
-// @namespace    http://tampermonkey.net/
+// @namespace    https://greasyfork.org/en/scripts/402786-mug-hunter
 // @version      0.1
 // @description  try to take over the world!
 // @author       You
