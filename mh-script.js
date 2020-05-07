@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Mug hunter
 // @namespace    https://greasyfork.org/en/scripts/402786-mug-hunter
-// @version      0.1
+// @version      0.2
 // @description  try to take over the world!
 // @author       You
 // @match        *.torn.com/page.php?sid=UserList*
@@ -79,6 +79,9 @@ let enrichPlayer = function(target) {
 
 let filterPlayers = function() {
 
+    console.log('filter players');
+    console.log(opts);
+
     // clear old data
     $('.mh-data').remove();
 
@@ -117,10 +120,14 @@ let filterPlayers = function() {
 
             })
 
+        } else {
+            console.log('not checking job...');
+            filterCurrent = false;
         }
 
         // filter based on travel status
         if (filterCurrent) {
+            console.log(`#${player.ID} hidden, based on job - ${player.job}`);
             player.element.hide();
         } else {
             player = enrichPlayer(player)
