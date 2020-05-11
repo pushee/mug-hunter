@@ -8,10 +8,10 @@
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @Require      file://D:\git\pushee\mug-hunter\mh-script.js
+// @require      file://D:\git\pushee\mug-hunter\mh-script.js
 // ==/UserScript==
 
-const DEBUG_ON = true;
+let   DEBUG_ON = false;
 const PREFS_KEY = "storedPrefs";
 const PLAYERS_KEY = "storedPlayers";
 
@@ -89,10 +89,12 @@ let formatCurrency = function(num){
 
 let loadPlayers = function() {
     players = GM_getValue(PLAYERS_KEY, []);
+    drawPlayers();
 }
 
 let savePlayers = function() {
     GM_setValue(PLAYERS_KEY, players)
+    loadPlayers();
 }
 
 let loadOpts = function() {
@@ -105,14 +107,11 @@ let loadOpts = function() {
     if (loadedOpts.hasOwnProperty("filters")) {
 
         log('opts are good, using loaded opts');
-        return loadedOpts;
-
-    } else {
-
-        log('opts are not good, using defaults');
-        return opts;
+        opts =  loadedOpts;
 
     }
+
+    drawUI();
 }
 
 let saveOpts = function() {
@@ -147,10 +146,49 @@ let saveOpts = function() {
     }
 
     GM_setValue(PREFS_KEY, opts)
+    loadOpts();
+}
+
+let drawPlayers = function() {
+
+    log('draw players');
+    if ($('.mh-player-wrapper').length > 0) {
+        $('.mh-player-wrapper').remove();
+    }
+
+    let bar = $(`
+    <div class="mh-player-wrapper">
+        <div class="mh-title-bar title-black top-round m-top10">
+            <span class="mh-border-right">Targets</span>
+            <div class="mh-toggleSettings right"></div>
+        </div>
+        <div class="mh-filterbar bottom-round cont-gray">
+        </div>
+    </div>`);
+
+    let elements = [];
+
+    players.forEach(player => {
+        elements.push($(`
+        <div class="mh-filterGroup">
+            <span><a href="/profiles.php?XID=${player.id}">${player.name}</a></span>
+        </div>`));
+    });
+
+    elements.forEach(element => {
+        log(element);
+        element.appendTo(bar.find('.mh-filterbar'));
+    })
+
+    bar.insertBefore('.userlist-wrapper');
 
 }
 
-let injectUI = function() {
+let drawUI = function() {
+
+    if ($('.mh-wrapper').length > 0) {
+        $('.mh-wrapper').remove();
+    }
 
     let bar = $(`
     <div class="mh-wrapper">
@@ -220,6 +258,7 @@ let injectUI = function() {
             <div class="mh-filterGroup">
                 <label for="mh-reset"></label>
                 <button id="mh-reset">RESET</button>
+                <button id="mh-clear">DELETE DATA</button>
             </div>
         </div>
     </div>`)
@@ -227,10 +266,17 @@ let injectUI = function() {
     bar.find('#mh-filterJob').val(opts.filters.jobs.values)
     bar.find('#mh-filterRank').val(opts.filters.ranks.values)
     bar.find('.mh-toggleSettings').click(() => $('.mh-filterbar').toggle());
+    
     bar.find('#mh-reset').click(() => {
-
-        log('RESET', true);
+        log('RESET SETTINGS', true);
         GM_setValue(PREFS_KEY, new Preferences())
+        loadOpts();
+    });
+
+    bar.find('#mh-clear').click(() => {
+        log('DELETE DATA', true);
+        GM_setValue(PLAYERS_KEY, [])
+        loadOpts();
     });
     
     $(bar).find('input, select').change(() => {
@@ -252,7 +298,7 @@ let addStyles = function() {
 }
 
 .pagination-wrap {
-    visibility: hidden;
+    display: none;
 }
 
 .mh-toggleSettings {
@@ -400,7 +446,6 @@ let postEnrichFilter = function(list) {
     
     let filterNetworth = function(player) {
         if (opts.filters.networth.enabled) {
-
             try {
                 return opts.filters.networth.value <= player.networth;
             } catch(ex) {
@@ -413,7 +458,6 @@ let postEnrichFilter = function(list) {
     
     let filterLosses = function(player) {
         if (opts.filters.losses.enabled) {
-
             try {
                 return opts.filters.losses.value >= player.losses;
             } catch(ex) {
@@ -469,8 +513,10 @@ let processPlayers = function(rawList) {
 
     rawList = preEnrichFilter(rawList);
 
+    log(`Rawlist: ${JSON.stringify(rawList)}`);
+
     // loop through user items
-    rawList.forEach(rawPlayer => {deferredList.push(enrichPlayer(this))})
+    rawList.forEach(rawPlayer => { deferredList.push(enrichPlayer(rawPlayer))} )
     
     $.when(...deferredList).then(function(...respArray) {
 
@@ -492,17 +538,19 @@ let processPlayers = function(rawList) {
 
         })
         
+        log(`processedList after enrichment: ${JSON.stringify(processedList)}`);
+
         // remove unwanteds
         processedList = postEnrichFilter(processedList);
+        log(`processedList after filtering: ${JSON.stringify(processedList)}`);
 
         // save
         processedList.forEach(addPlayer);
-        
+        log(`processedList: ${JSON.stringify(processedList)}`);
+
         // save
         savePlayers();
-
-        //log it out
-        log(players, true);
+        log(players);
 
         if (opts.settings.scan) {
             setTimeout(
@@ -524,18 +572,27 @@ let init = function() {
     addStyles();
 
     // get opts
-    opts = loadOpts();
-
-    // inject filter bar
-    injectUI();
+    loadOpts();
 
     // load players
     loadPlayers();
 
     // piggyback off ajax completion events, check that it is for this page
     $( document ).ajaxComplete(function(event, resp, params) {
-        if (params.url.indexOf('https://www.torn.com/page.php') == 0) {
-            processPlayers(JSON.parse(resp.responseText).list);
+        
+        try {
+            if (resp.status == 200) {
+                if (params.url.indexOf('https://www.torn.com/page.php') == 0) {
+                    processPlayers(JSON.parse(resp.responseText).list);
+                }
+            } else {
+                throw `Get players status != 200 [actual ${resp.status}]`
+            }
+        } catch (ex) {
+            log(ex);
+            log(event, true);
+            log(resp, true);
+            log(params, true);
         }
     });
 };
