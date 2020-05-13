@@ -8,6 +8,7 @@
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_deleteValue
 // @require      file://D:\git\pushee\mug-hunter\mh-script.js
 // ==/UserScript==
 
@@ -49,6 +50,10 @@ class Preferences {
                 losses: {
                     enabled: true,
                     value: 100
+                },
+                state: {
+                    enabled: true,
+                    values: ['Abroad', 'Travelling']
                 }
             }
         };
@@ -65,7 +70,7 @@ class Preferences {
 }
 
 let opts = new Preferences();
-let players = [];
+let players = new Array();
 
 let formatCurrency = function(num){
     var str = num.toString().replace("$", ""), parts = false, output = [], i = 1, formatted = null;
@@ -86,6 +91,13 @@ let formatCurrency = function(num){
     formatted = output.reverse().join("");
     return("$" + formatted + ((parts) ? "." + parts[1].substr(0, 2) : ""));
 };
+
+
+let doScan = function() {
+    if (opts.settings.scan) {
+        $('.pagination-wrap').first().find('a').last().click()
+    }
+}
 
 let loadPlayers = function() {
     players = GM_getValue(PLAYERS_KEY, []);
@@ -137,6 +149,10 @@ let saveOpts = function() {
         losses: {
             enabled: $('#mh-filterLosses').val() !== '',
             value: $('#mh-filterLosses').val()
+        },
+        state: {
+            enabled: true,
+            values: ['Abroad', 'Travelling']
         }
     }
 
@@ -180,7 +196,7 @@ let drawPlayers = function() {
         element.appendTo(bar.find('.mh-filterbar'));
     })
 
-    bar.insertBefore('.userlist-wrapper');
+    bar.insertAfter('.mh-wrapper');
 
 }
 
@@ -275,7 +291,8 @@ let drawUI = function() {
 
     bar.find('#mh-clear').click(() => {
         log('DELETE DATA', true);
-        GM_setValue(PLAYERS_KEY, [])
+        players = new Array();
+        savePlayers();
         loadOpts();
     });
     
@@ -416,7 +433,7 @@ let preEnrichFilter = function(list) {
                         .replace(/( in the).*$/g, '')
                         .replace('Job', '')
 
-                return opts.filters.jobs.values.findIndex(test => rawPlayer.job.indexOf(test) >= 0) >= 0;
+                return opts.filters.jobs.values.findIndex(test => rawPlayer.job.toLowerCase().indexOf(test.toLowerCase()) >= 0) >= 0;
                 
             } catch(ex) {
                 return false;
@@ -431,6 +448,18 @@ let preEnrichFilter = function(list) {
 };
 
 let postEnrichFilter = function(list) {
+
+    let filterState = function(player) {
+        if (opts.filters.state.enabled) {
+            try {
+                return !(opts.filters.state.values.findIndex(test => player.status.toLowerCase().indexOf(test.toLowerCase()) >= 0) >= 0);
+            } catch(ex) {
+                return false;
+            }   
+        } else {
+            return true;
+        }
+    }
 
     let filterRank = function(player) {
         if (opts.filters.ranks.enabled) {
@@ -467,11 +496,25 @@ let postEnrichFilter = function(list) {
             return true;
         }
     }
+    
+    let filterActivity = function(player) {
+        if (opts.filters.lastOnline.enabled) {
+            try {
+                return opts.filters.lastOnline.value <= player.lastOnline;
+            } catch(ex) {
+                return false;
+            }   
+        } else {
+            return true;
+        }
+    }
 
     return list
         .filter(filterRank)
         .filter(filterLosses)
-        .filter(filterNetworth);
+        .filter(filterNetworth)
+        .filter(filterActivity)
+        .filter(filterState);
 
 };
 
@@ -552,14 +595,8 @@ let processPlayers = function(rawList) {
         savePlayers();
         log(players);
 
-        if (opts.settings.scan) {
-            setTimeout(
-                function() {
-                    log('click!');
-                    $('.pagination-wrap').first().find('a').last().click()
-                }, Math.floor(Math.random() * Math.floor(4000)) + 2000
-            )
-        }
+        // scan next
+        doScan();
 
     })
     
