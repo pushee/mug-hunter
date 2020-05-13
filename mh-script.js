@@ -9,7 +9,10 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
-// @require      file://D:\git\pushee\mug-hunter\mh-script.js
+// @require      https://code.jquery.com/jquery-3.5.1.slim.min.js
+// @require      https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js
+// @require      https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css
+// @require      file://C:\Users\mikef\git\mug-hunter\mh-script.js
 // ==/UserScript==
 
 let   DEBUG_ON = false;
@@ -101,12 +104,10 @@ let doScan = function() {
 
 let loadPlayers = function() {
     players = GM_getValue(PLAYERS_KEY, []);
-    drawPlayers();
 }
 
 let savePlayers = function() {
     GM_setValue(PLAYERS_KEY, players)
-    loadPlayers();
 }
 
 let loadOpts = function() {
@@ -123,7 +124,6 @@ let loadOpts = function() {
 
     }
 
-    drawUI();
 }
 
 let saveOpts = function() {
@@ -168,49 +168,35 @@ let saveOpts = function() {
 let drawPlayers = function() {
 
     log('draw players');
-    if ($('.mh-player-wrapper').length > 0) {
-        $('.mh-player-wrapper').remove();
-    }
-
-    let bar = $(`
-    <div class="mh-player-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10">
-            <span class="mh-border-right">Targets</span>
-            <div class="mh-toggleSettings right"></div>
-        </div>
-        <div class="mh-filterbar bottom-round cont-gray">
-        </div>
-    </div>`);
-
     let elements = [];
 
     players.forEach(player => {
         elements.push($(`
-        <div class="mh-filterGroup">
-            <span><a href="/profiles.php?XID=${player.id}">${player.name}</a></span>
-        </div>`));
+        <tr>
+            <td class="tg-0lax"><a href="/profiles.php?XID=${player.id}">${player.name}</a></td>
+            <td class="tg-0lax">${player.id}</td>
+            <td class="tg-0lax">${player.losses}</td>
+            <td class="tg-0lax">${player.lastOnline}</td>
+            <td class="tg-0lax">${player.networth}</td>
+            <td class="tg-0lax">-</td>
+        </tr>
+        `));
     });
 
     elements.forEach(element => {
         log(element);
-        element.appendTo(bar.find('.mh-filterbar'));
+        element.appendTo($('.mh-player-wrapper').find('.mh-target-table').find('tbody'));
     })
-
-    bar.insertAfter('.mh-wrapper');
 
 }
 
 let drawUI = function() {
 
-    if ($('.mh-wrapper').length > 0) {
-        $('.mh-wrapper').remove();
-    }
-
     let bar = $(`
     <div class="mh-wrapper">
         <div class="mh-title-bar title-black top-round m-top10">
             <span class="mh-border-right">MugHunter</span>
-            <div class="mh-toggleSettings right"></div>
+            <div class="mh-scan-indicator right"></div>
         </div>
         <div class="mh-filterbar bottom-round cont-gray">
             <div class="mh-filterTitle">
@@ -277,11 +263,35 @@ let drawUI = function() {
                 <button id="mh-clear">DELETE DATA</button>
             </div>
         </div>
-    </div>`)
+    </div>
+    
+    <div class="mh-player-wrapper">
+        <div class="mh-title-bar title-black top-round m-top10">
+            <span class="">Targets</span>
+        </div>
+        <div class="mh-filterbar bottom-round cont-gray">
+            <table class="mh-target-table">
+                <thead>
+                    <tr>
+                        <th class="tg-0lax">Name</th>
+                        <th class="tg-0lax">Id</th>
+                        <th class="tg-0lax">Losses</th>
+                        <th class="tg-0lax">Last Online</th>
+                        <th class="tg-0lax">Networth</th>
+                        <th class="tg-0lax">History</th>
+                    </tr>
+                </thead>
+                <tbody>
+                
+                </tbody>
+            </table>
+        </div>
+    </div>
+    `)
 
     bar.find('#mh-filterJob').val(opts.filters.jobs.values)
     bar.find('#mh-filterRank').val(opts.filters.ranks.values)
-    bar.find('.mh-toggleSettings').click(() => $('.mh-filterbar').toggle());
+    bar.find('.mh-title-bar').click(() => $('.mh-filterbar').toggle());
     
     bar.find('#mh-reset').click(() => {
         log('RESET SETTINGS', true);
@@ -296,12 +306,14 @@ let drawUI = function() {
         loadOpts();
     });
     
-    $(bar).find('input, select').change(() => {
+    bar.find('input, select').change(() => {
         saveOpts();
         if (opts.settings.scan) {
             $('.pagination-wrap').first().find('a').last().click()
         }
     });
+    
+    // bar.find('.mh-target-table').DataTable();
     
     bar.insertBefore('.userlist-wrapper');
 
@@ -610,9 +622,14 @@ let init = function() {
 
     // get opts
     loadOpts();
-
+    
     // load players
     loadPlayers();
+
+    //draw ui
+    drawUI();
+
+    drawPlayers();
 
     // piggyback off ajax completion events, check that it is for this page
     $( document ).ajaxComplete(function(event, resp, params) {
@@ -639,5 +656,6 @@ let init = function() {
 // attach event listener to document ready
 $(document).ready(function () {
     'use strict';
-    init()
+    log($.fn.jquery, true)
+    init();
 })
