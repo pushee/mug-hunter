@@ -261,7 +261,7 @@ let drawUI = function() {
             <span class="">Targets</span>
         </div>
         <div class="mh-filterbar bottom-round cont-gray">
-            <table class="mh-target-table">
+            <table class="mh-target-table display cell-border hover order-column row-border stripe">
                 <thead>
                     <tr>
                         <th class="tg-0lax">Name</th>
@@ -311,7 +311,20 @@ let drawUI = function() {
             { "data": "name" },
             { "data": "id" },
             { "data": "losses" },
-            { "data": "lastOnline" },
+            {
+                data: 'lastOnline',
+                render: function ( data, type, row ) {
+                    // If display or filter data is requested, format the date
+                    if ( type === 'display' || type === 'filter' ) {
+                        return Math.floor((new Date().getTime() / 1000 - data) / 60 /60 / 24) + " days ago"
+                    }
+             
+                    // Otherwise the data type requested (`type`) is type detection or
+                    // sorting data, for which we want to use the integer, so just return
+                    // that, unaltered
+                    return data;
+                }
+            },
             { "data": "networth" },
             { "data": "status" }
         ]
