@@ -9,15 +9,17 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
-// @require      https://code.jquery.com/jquery-3.5.1.slim.min.js
+// @grant        GM_getResourceText
 // @require      https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js
-// @require      https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css
-// @require      file://C:\Users\mikef\git\mug-hunter\mh-script.js
+// @resource     dataTablesStyles https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css
+// @require      file://D:\git\pushee\mug-hunter\mh-script.js
 // ==/UserScript==
+
 
 let   DEBUG_ON = false;
 const PREFS_KEY = "storedPrefs";
 const PLAYERS_KEY = "storedPlayers";
+let   dataTable = null;
 
 let log = function(text, override = false) {
     if (DEBUG_ON || override) console.log(text);
@@ -104,6 +106,7 @@ let doScan = function() {
 
 let loadPlayers = function() {
     players = GM_getValue(PLAYERS_KEY, []);
+    document.players = players;
 }
 
 let savePlayers = function() {
@@ -168,25 +171,13 @@ let saveOpts = function() {
 let drawPlayers = function() {
 
     log('draw players');
-    let elements = [];
-
-    players.forEach(player => {
-        elements.push($(`
-        <tr>
-            <td class="tg-0lax"><a href="/profiles.php?XID=${player.id}">${player.name}</a></td>
-            <td class="tg-0lax">${player.id}</td>
-            <td class="tg-0lax">${player.losses}</td>
-            <td class="tg-0lax">${player.lastOnline}</td>
-            <td class="tg-0lax">${player.networth}</td>
-            <td class="tg-0lax">-</td>
-        </tr>
-        `));
-    });
-
-    elements.forEach(element => {
-        log(element);
-        element.appendTo($('.mh-player-wrapper').find('.mh-target-table').find('tbody'));
+    dataTable.clear().draw();
+    
+    players.forEach( x => {
+        dataTable.row.add(x)
     })
+
+    dataTable.draw();
 
 }
 
@@ -194,11 +185,11 @@ let drawUI = function() {
 
     let bar = $(`
     <div class="mh-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10">
-            <span class="mh-border-right">MugHunter</span>
+        <div class="mh-title-bar title-black top-round m-top10" >
+            <span class="">MugHunter</span>
             <div class="mh-scan-indicator right"></div>
         </div>
-        <div class="mh-filterbar bottom-round cont-gray">
+        <div class="mh-filterbar bottom-round cont-gray" style="display: none;">
             <div class="mh-filterTitle">
                 Filter options
             </div>
@@ -291,7 +282,7 @@ let drawUI = function() {
 
     bar.find('#mh-filterJob').val(opts.filters.jobs.values)
     bar.find('#mh-filterRank').val(opts.filters.ranks.values)
-    bar.find('.mh-title-bar').click(() => $('.mh-filterbar').toggle());
+    bar.find('.mh-title-bar').click(function() { $(this).siblings('.mh-filterbar').toggle() });
     
     bar.find('#mh-reset').click(() => {
         log('RESET SETTINGS', true);
@@ -313,13 +304,25 @@ let drawUI = function() {
         }
     });
     
-    // bar.find('.mh-target-table').DataTable();
-    
     bar.insertBefore('.userlist-wrapper');
+    
+    dataTable = $('.mh-target-table').DataTable({
+        columns: [
+            { "data": "name" },
+            { "data": "id" },
+            { "data": "losses" },
+            { "data": "lastOnline" },
+            { "data": "networth" },
+            { "data": "status" }
+        ]
+    })
 
 };
 
 let addStyles = function() {
+
+    var dataTablesStyles = GM_getResourceText ("dataTablesStyles");
+    GM_addStyle (dataTablesStyles);
     GM_addStyle(`
 
 .mh-filterbar {
@@ -330,7 +333,11 @@ let addStyles = function() {
     display: none;
 }
 
-.mh-toggleSettings {
+.mh-title-bar {
+    cursor: pointer;
+}
+
+.mh-scan-indicator {
     margin-right: 10px;
     border: 2px solid #575757;
     width: 1em;
@@ -338,15 +345,13 @@ let addStyles = function() {
     margin-top: 0.5em;
     border-radius: 1em;
     background-color: #169ee4;
-    cursor: pointer;
 }
 
-.mh-toggleSettings:hover {
+.mh-scan-indicator:hover {
     background-color: #56adda;
-    
 }
 
-mh-toggleSettings span {
+.mh-scan-indicator span {
     position: relative;
     top: -10px;
 }
@@ -426,7 +431,6 @@ mh-toggleSettings span {
     }
 
 }
-
     `);
 };
 
@@ -605,7 +609,8 @@ let processPlayers = function(rawList) {
 
         // save
         savePlayers();
-        log(players);
+
+        drawPlayers();
 
         // scan next
         doScan();
