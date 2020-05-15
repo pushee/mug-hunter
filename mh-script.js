@@ -16,10 +16,60 @@
 // ==/UserScript==
 
 
+// Initializing a class definition
+class Player {
+
+    constructor(id) {
+        this._id = id;
+    }
+    
+}
+
+class Counter {
+
+    constructor(limit, expiresIn) {
+        this._stack = [];
+        this._limit = limit;
+        this._expiresIn = expiresIn;
+    }
+
+    // add item to stack
+    push() {
+        this.getStack().push(new Date().getTime());
+        this.filterStack();
+    }
+    
+    hasCapacity(intention = 0) {
+        return (this.getStack().length + intention) < this.getLimit();
+    }
+
+    // purge old items
+    filterStack() {
+        this.setStack( this.getStack().filter(x => {
+            return ((new Date().getTime() - x) / 1000) < this.getExpiresIn()
+        }));
+
+        // reccur until items are gone (lenght is 0) 
+        if (this.getStack().length > 0) {
+            setTimeout(() => this.filterStack(), 1000);
+        }
+    }
+    
+    // getters and setters
+    getLimit() { return this._limit; }
+    setLimit(limit) { this._limit = limit; }
+    getExpiresIn() { return this._expiresIn; }
+    setExpiresIn(expiresIn) { this._expiresIn = expiresIn; }
+    getStack() { return this._stack; }
+    setStack(stack) { this._stack = stack; }
+}
+
+
 let   DEBUG_ON = false;
 const PREFS_KEY = "storedPrefs";
 const PLAYERS_KEY = "storedPlayers";
 let   dataTable = null;
+let   callCounter = new Counter(80, 60);
 
 let log = function(text, override = false) {
     if (DEBUG_ON || override) console.log(text);
@@ -325,7 +375,20 @@ let drawUI = function() {
                     return data;
                 }
             },
-            { "data": "networth" },
+            {
+                data: 'networth',
+                render: function ( data, type, row ) {
+                    // If display or filter data is requested, format the date
+                    if ( type === 'display' || type === 'filter' ) {
+                        return formatCurrency(data)
+                    }
+             
+                    // Otherwise the data type requested (`type`) is type detection or
+                    // sorting data, for which we want to use the integer, so just return
+                    // that, unaltered
+                    return data;
+                }
+            },
             { "data": "status" }
         ]
     })
@@ -338,113 +401,111 @@ let addStyles = function() {
     GM_addStyle (dataTablesStyles);
     GM_addStyle(`
 
-.mh-filterbar {
-    height: auto!important;
-}
-
-.pagination-wrap {
-    display: none;
-}
-
-.mh-title-bar {
-    cursor: pointer;
-}
-
-.mh-scan-indicator {
-    margin-right: 10px;
-    border: 2px solid #575757;
-    width: 1em;
-    height: 1em;
-    margin-top: 0.5em;
-    border-radius: 1em;
-    background-color: #169ee4;
-}
-
-.mh-scan-indicator:hover {
-    background-color: #56adda;
-}
-
-.mh-scan-indicator span {
-    position: relative;
-    top: -10px;
-}
-
-.mh-filterbar.bottom-round.cont-gray {
-    padding: 10px;
-}
-
-.mh-filterTitle {
-    background-color: #ccc;
-    border-bottom: 3px solid #ddd;
-    border-radius: 2px;
-    padding: 6px;
-    font-weight: 600;
-    margin-bottom: 10px;
-}
-
-.mh-filterGroup {
-    margin-bottom: 10px;
-    vertical-align: top;
-}
-
-.mh-filterGroup label {
-    line-height: 1.5em;
-    width: 140px;
-    display: inline-block;
-    text-align: right;
-    margin-right: 10px;
-    vertical-align: text-top;
-    padding: 1px;
-}
-
-.mh-filterGroup input[type=textbox] {
-    border: 1px solid #666;
-    padding-left: 6px;
-    width: 200px;
-    line-height: 1.5em;
-    vertical-align: text-top;
-    border-radius: 2px;
-}
-
-.mh-filterGroup input[type=checkbox] {
-    top: 4px;
-    position: relative;
-}
-
-.mh-filterGroup select {
-    border: 1px solid #666;
-    padding-left: 6px;
-    width: 200px;
-    line-height: 1.5em;
-    vertical-align: text-top;
-    border-radius: 2px;
-}
-
-@media only screen and (max-width: 1000px) {
-
     .mh-filterbar {
-    padding: 4px;
+        height: auto!important;
     }
 
-    li.mh-data {
+    .pagination-wrap {
+        display: none;
+    }
+
+    .mh-title-bar {
+        cursor: pointer;
+    }
+
+    .mh-scan-indicator {
+        margin-right: 10px;
+        border: 2px solid #575757;
+        width: 1em;
+        height: 1em;
+        margin-top: 0.5em;
+        border-radius: 1em;
+        background-color: #169ee4;
+    }
+
+    .mh-scan-indicator:hover {
+        background-color: #56adda;
+    }
+
+    .mh-scan-indicator span {
+        position: relative;
+        top: -10px;
+    }
+
+    .mh-filterbar.bottom-round.cont-gray {
+        padding: 10px;
+    }
+
+    .mh-filterTitle {
+        background-color: #ccc;
+        border-bottom: 3px solid #ddd;
+        border-radius: 2px;
+        padding: 6px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .mh-filterGroup {
+        margin-bottom: 10px;
+        vertical-align: top;
+    }
+
+    .mh-filterGroup label {
+        line-height: 1.5em;
+        width: 140px;
+        display: inline-block;
+        text-align: right;
+        margin-right: 10px;
+        vertical-align: text-top;
+        padding: 1px;
+    }
+
+    .mh-filterGroup input[type=textbox] {
+        border: 1px solid #666;
         padding-left: 6px;
+        width: 200px;
+        line-height: 1.5em;
+        vertical-align: text-top;
+        border-radius: 2px;
     }
 
-    .mh-filterbar span {
-        padding: 2px;
-        display: block;
-        width: 90%;
-        line-height: 1.8em!important;
+    .mh-filterGroup input[type=checkbox] {
+        top: 4px;
+        position: relative;
     }
 
-    .mh-border-right {
-        border-right: 0px solid #ccc;
-        border-bottom: 2px solid #ccc;
-        margin-bottom: 3px;
+    .mh-filterGroup select {
+        border: 1px solid #666;
+        padding-left: 6px;
+        width: 200px;
+        line-height: 1.5em;
+        vertical-align: text-top;
+        border-radius: 2px;
     }
 
-}
+    .mh-target-table {
+        margin-top: 10px!important;
+    }
+
+    @media only screen and (max-width: 1000px) {
+
+        .mh-filterbar {
+        padding: 4px;
+        }
+
+        li.mh-data {
+            padding-left: 6px;
+        }
+
+        .mh-border-right {
+            border-right: 0px solid #ccc;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 3px;
+        }
+
+    }
     `);
+
 };
 
 let preEnrichFilter = function(list) {
@@ -586,9 +647,24 @@ let processPlayers = function(rawList) {
     rawList = preEnrichFilter(rawList);
 
     log(`Rawlist: ${JSON.stringify(rawList)}`);
+    log(callCounter);
+
+    // check if we can perform required api calls given current stack
+    if (!callCounter.hasCapacity(rawList.length)) {
+        
+        log('api limit reached! waiting for drain', true);
+        setTimeout( () => {
+            processPlayers(rawList)
+        },  10000);
+        return false;
+
+    }
 
     // loop through user items
-    rawList.forEach(rawPlayer => { deferredList.push(enrichPlayer(rawPlayer))} )
+    rawList.forEach(rawPlayer => { 
+        deferredList.push(enrichPlayer(rawPlayer))
+        callCounter.push();
+    })
     
     $.when(...deferredList).then(function(...respArray) {
 
@@ -623,6 +699,7 @@ let processPlayers = function(rawList) {
         // save
         savePlayers();
 
+        // 
         drawPlayers();
 
         // scan next
@@ -661,7 +738,7 @@ let init = function() {
                 throw `Get players status != 200 [actual ${resp.status}]`
             }
         } catch (ex) {
-            log(ex);
+            log(ex, true);
             log(event, true);
             log(resp, true);
             log(params, true);
