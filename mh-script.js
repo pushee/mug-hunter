@@ -9,12 +9,67 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_getResourceText
+// @require      https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js
+// @resource     dataTablesStyles https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css
 // @require      file://D:\git\pushee\mug-hunter\mh-script.js
 // ==/UserScript==
+
+
+// Initializing a class definition
+class Player {
+
+    constructor(id) {
+        this._id = id;
+    }
+    
+}
+
+class Counter {
+
+    constructor(limit, expiresIn) {
+        this._stack = [];
+        this._limit = limit;
+        this._expiresIn = expiresIn;
+    }
+
+    // add item to stack
+    push() {
+        this.getStack().push(new Date().getTime());
+        this.filterStack();
+    }
+    
+    hasCapacity(intention = 0) {
+        return (this.getStack().length + intention) < this.getLimit();
+    }
+
+    // purge old items
+    filterStack() {
+        this.setStack( this.getStack().filter(x => {
+            return ((new Date().getTime() - x) / 1000) < this.getExpiresIn()
+        }));
+
+        // reccur until items are gone (lenght is 0) 
+        if (this.getStack().length > 0) {
+            setTimeout(() => this.filterStack(), 1000);
+        }
+    }
+    
+    // getters and setters
+    getLimit() { return this._limit; }
+    setLimit(limit) { this._limit = limit; }
+    getExpiresIn() { return this._expiresIn; }
+    setExpiresIn(expiresIn) { this._expiresIn = expiresIn; }
+    getStack() { return this._stack; }
+    setStack(stack) { this._stack = stack; }
+}
+
 
 let   DEBUG_ON = false;
 const PREFS_KEY = "storedPrefs";
 const PLAYERS_KEY = "storedPlayers";
+let   dataTable = null;
+let   callCounter = new Counter(80, 60);
 
 let log = function(text, override = false) {
     if (DEBUG_ON || override) console.log(text);
@@ -101,12 +156,11 @@ let doScan = function() {
 
 let loadPlayers = function() {
     players = GM_getValue(PLAYERS_KEY, []);
-    drawPlayers();
+    document.players = players;
 }
 
 let savePlayers = function() {
     GM_setValue(PLAYERS_KEY, players)
-    loadPlayers();
 }
 
 let loadOpts = function() {
@@ -123,7 +177,6 @@ let loadOpts = function() {
 
     }
 
-    drawUI();
 }
 
 let saveOpts = function() {
@@ -168,51 +221,25 @@ let saveOpts = function() {
 let drawPlayers = function() {
 
     log('draw players');
-    if ($('.mh-player-wrapper').length > 0) {
-        $('.mh-player-wrapper').remove();
-    }
-
-    let bar = $(`
-    <div class="mh-player-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10">
-            <span class="mh-border-right">Targets</span>
-            <div class="mh-toggleSettings right"></div>
-        </div>
-        <div class="mh-filterbar bottom-round cont-gray">
-        </div>
-    </div>`);
-
-    let elements = [];
-
-    players.forEach(player => {
-        elements.push($(`
-        <div class="mh-filterGroup">
-            <span><a href="/profiles.php?XID=${player.id}">${player.name}</a></span>
-        </div>`));
-    });
-
-    elements.forEach(element => {
-        log(element);
-        element.appendTo(bar.find('.mh-filterbar'));
+    dataTable.clear().draw();
+    
+    players.forEach( x => {
+        dataTable.row.add(x)
     })
 
-    bar.insertAfter('.mh-wrapper');
+    dataTable.draw();
 
 }
 
 let drawUI = function() {
 
-    if ($('.mh-wrapper').length > 0) {
-        $('.mh-wrapper').remove();
-    }
-
     let bar = $(`
     <div class="mh-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10">
-            <span class="mh-border-right">MugHunter</span>
-            <div class="mh-toggleSettings right"></div>
+        <div class="mh-title-bar title-black top-round m-top10" >
+            <span class="">MugHunter</span>
+            <div class="mh-scan-indicator right"></div>
         </div>
-        <div class="mh-filterbar bottom-round cont-gray">
+        <div class="mh-filterbar bottom-round cont-gray" style="display: none;">
             <div class="mh-filterTitle">
                 Filter options
             </div>
@@ -277,11 +304,35 @@ let drawUI = function() {
                 <button id="mh-clear">DELETE DATA</button>
             </div>
         </div>
-    </div>`)
+    </div>
+    
+    <div class="mh-player-wrapper">
+        <div class="mh-title-bar title-black top-round m-top10">
+            <span class="">Targets</span>
+        </div>
+        <div class="mh-filterbar bottom-round cont-gray">
+            <table class="mh-target-table display cell-border hover order-column row-border stripe">
+                <thead>
+                    <tr>
+                        <th class="tg-0lax">Name</th>
+                        <th class="tg-0lax">Id</th>
+                        <th class="tg-0lax">Losses</th>
+                        <th class="tg-0lax">Last Online</th>
+                        <th class="tg-0lax">Networth</th>
+                        <th class="tg-0lax">History</th>
+                    </tr>
+                </thead>
+                <tbody>
+                
+                </tbody>
+            </table>
+        </div>
+    </div>
+    `)
 
     bar.find('#mh-filterJob').val(opts.filters.jobs.values)
     bar.find('#mh-filterRank').val(opts.filters.ranks.values)
-    bar.find('.mh-toggleSettings').click(() => $('.mh-filterbar').toggle());
+    bar.find('.mh-title-bar').click(function() { $(this).siblings('.mh-filterbar').toggle() });
     
     bar.find('#mh-reset').click(() => {
         log('RESET SETTINGS', true);
@@ -296,7 +347,7 @@ let drawUI = function() {
         loadOpts();
     });
     
-    $(bar).find('input, select').change(() => {
+    bar.find('input, select').change(() => {
         saveOpts();
         if (opts.settings.scan) {
             $('.pagination-wrap').first().find('a').last().click()
@@ -304,118 +355,157 @@ let drawUI = function() {
     });
     
     bar.insertBefore('.userlist-wrapper');
+    
+    dataTable = $('.mh-target-table').DataTable({
+        columns: [
+            { "data": "name" },
+            { "data": "id" },
+            { "data": "losses" },
+            {
+                data: 'lastOnline',
+                render: function ( data, type, row ) {
+                    // If display or filter data is requested, format the date
+                    if ( type === 'display' || type === 'filter' ) {
+                        return Math.floor((new Date().getTime() / 1000 - data) / 60 /60 / 24) + " days ago"
+                    }
+             
+                    // Otherwise the data type requested (`type`) is type detection or
+                    // sorting data, for which we want to use the integer, so just return
+                    // that, unaltered
+                    return data;
+                }
+            },
+            {
+                data: 'networth',
+                render: function ( data, type, row ) {
+                    // If display or filter data is requested, format the date
+                    if ( type === 'display' || type === 'filter' ) {
+                        return formatCurrency(data)
+                    }
+             
+                    // Otherwise the data type requested (`type`) is type detection or
+                    // sorting data, for which we want to use the integer, so just return
+                    // that, unaltered
+                    return data;
+                }
+            },
+            { "data": "status" }
+        ]
+    })
 
 };
 
 let addStyles = function() {
+
+    var dataTablesStyles = GM_getResourceText ("dataTablesStyles");
+    GM_addStyle (dataTablesStyles);
     GM_addStyle(`
 
-.mh-filterbar {
-    height: auto!important;
-}
-
-.pagination-wrap {
-    display: none;
-}
-
-.mh-toggleSettings {
-    margin-right: 10px;
-    border: 2px solid #575757;
-    width: 1em;
-    height: 1em;
-    margin-top: 0.5em;
-    border-radius: 1em;
-    background-color: #169ee4;
-    cursor: pointer;
-}
-
-.mh-toggleSettings:hover {
-    background-color: #56adda;
-    
-}
-
-mh-toggleSettings span {
-    position: relative;
-    top: -10px;
-}
-
-.mh-filterbar.bottom-round.cont-gray {
-    padding: 10px;
-}
-
-.mh-filterTitle {
-    background-color: #ccc;
-    border-bottom: 3px solid #ddd;
-    border-radius: 2px;
-    padding: 6px;
-    font-weight: 600;
-    margin-bottom: 10px;
-}
-
-.mh-filterGroup {
-    margin-bottom: 10px;
-    vertical-align: top;
-}
-
-.mh-filterGroup label {
-    line-height: 1.5em;
-    width: 140px;
-    display: inline-block;
-    text-align: right;
-    margin-right: 10px;
-    vertical-align: text-top;
-    padding: 1px;
-}
-
-.mh-filterGroup input[type=textbox] {
-    border: 1px solid #666;
-    padding-left: 6px;
-    width: 200px;
-    line-height: 1.5em;
-    vertical-align: text-top;
-    border-radius: 2px;
-}
-
-.mh-filterGroup input[type=checkbox] {
-    top: 4px;
-    position: relative;
-}
-
-.mh-filterGroup select {
-    border: 1px solid #666;
-    padding-left: 6px;
-    width: 200px;
-    line-height: 1.5em;
-    vertical-align: text-top;
-    border-radius: 2px;
-}
-
-@media only screen and (max-width: 1000px) {
-
     .mh-filterbar {
-    padding: 4px;
+        height: auto!important;
     }
 
-    li.mh-data {
+    .pagination-wrap {
+        display: none;
+    }
+
+    .mh-title-bar {
+        cursor: pointer;
+    }
+
+    .mh-scan-indicator {
+        margin-right: 10px;
+        border: 2px solid #575757;
+        width: 1em;
+        height: 1em;
+        margin-top: 0.5em;
+        border-radius: 1em;
+        background-color: #169ee4;
+    }
+
+    .mh-scan-indicator:hover {
+        background-color: #56adda;
+    }
+
+    .mh-scan-indicator span {
+        position: relative;
+        top: -10px;
+    }
+
+    .mh-filterbar.bottom-round.cont-gray {
+        padding: 10px;
+    }
+
+    .mh-filterTitle {
+        background-color: #ccc;
+        border-bottom: 3px solid #ddd;
+        border-radius: 2px;
+        padding: 6px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .mh-filterGroup {
+        margin-bottom: 10px;
+        vertical-align: top;
+    }
+
+    .mh-filterGroup label {
+        line-height: 1.5em;
+        width: 140px;
+        display: inline-block;
+        text-align: right;
+        margin-right: 10px;
+        vertical-align: text-top;
+        padding: 1px;
+    }
+
+    .mh-filterGroup input[type=textbox] {
+        border: 1px solid #666;
         padding-left: 6px;
+        width: 200px;
+        line-height: 1.5em;
+        vertical-align: text-top;
+        border-radius: 2px;
     }
 
-    .mh-filterbar span {
-        padding: 2px;
-        display: block;
-        width: 90%;
-        line-height: 1.8em!important;
+    .mh-filterGroup input[type=checkbox] {
+        top: 4px;
+        position: relative;
     }
 
-    .mh-border-right {
-        border-right: 0px solid #ccc;
-        border-bottom: 2px solid #ccc;
-        margin-bottom: 3px;
+    .mh-filterGroup select {
+        border: 1px solid #666;
+        padding-left: 6px;
+        width: 200px;
+        line-height: 1.5em;
+        vertical-align: text-top;
+        border-radius: 2px;
     }
 
-}
+    .mh-target-table {
+        margin-top: 10px!important;
+    }
 
+    @media only screen and (max-width: 1000px) {
+
+        .mh-filterbar {
+        padding: 4px;
+        }
+
+        li.mh-data {
+            padding-left: 6px;
+        }
+
+        .mh-border-right {
+            border-right: 0px solid #ccc;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 3px;
+        }
+
+    }
     `);
+
 };
 
 let preEnrichFilter = function(list) {
@@ -557,9 +647,24 @@ let processPlayers = function(rawList) {
     rawList = preEnrichFilter(rawList);
 
     log(`Rawlist: ${JSON.stringify(rawList)}`);
+    log(callCounter);
+
+    // check if we can perform required api calls given current stack
+    if (!callCounter.hasCapacity(rawList.length)) {
+        
+        log('api limit reached! waiting for drain', true);
+        setTimeout( () => {
+            processPlayers(rawList)
+        },  10000);
+        return false;
+
+    }
 
     // loop through user items
-    rawList.forEach(rawPlayer => { deferredList.push(enrichPlayer(rawPlayer))} )
+    rawList.forEach(rawPlayer => { 
+        deferredList.push(enrichPlayer(rawPlayer))
+        callCounter.push();
+    })
     
     $.when(...deferredList).then(function(...respArray) {
 
@@ -593,7 +698,9 @@ let processPlayers = function(rawList) {
 
         // save
         savePlayers();
-        log(players);
+
+        // 
+        drawPlayers();
 
         // scan next
         doScan();
@@ -610,9 +717,14 @@ let init = function() {
 
     // get opts
     loadOpts();
-
+    
     // load players
     loadPlayers();
+
+    //draw ui
+    drawUI();
+
+    drawPlayers();
 
     // piggyback off ajax completion events, check that it is for this page
     $( document ).ajaxComplete(function(event, resp, params) {
@@ -626,7 +738,7 @@ let init = function() {
                 throw `Get players status != 200 [actual ${resp.status}]`
             }
         } catch (ex) {
-            log(ex);
+            log(ex, true);
             log(event, true);
             log(resp, true);
             log(params, true);
@@ -639,5 +751,6 @@ let init = function() {
 // attach event listener to document ready
 $(document).ready(function () {
     'use strict';
-    init()
+    log($.fn.jquery, true)
+    init();
 })
