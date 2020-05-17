@@ -19,8 +19,29 @@
 // Initializing a class definition
 class Player {
 
-    constructor(id) {
+    constructor(rawPlayer) {
         this._id = id;
+        this._name = null;
+        this._age = null;
+        this._rank = null;
+        this._lastOnline = null;
+        this._status = null;
+        this._networth = null;
+        this._losses = null;
+        this._job = rawPlayer.job;
+    }
+
+    enrich(callback) {
+        $.ajax(`https://api.torn.com/user/${this._id}?selections=profile,personalstats&key=${opts.settings.apiKey}`)
+            .success(data => {
+                this._name = data.name;
+                this._age = data.age;
+                this._rank = data.rank.toLowerCase();
+                this._lastOnline = data.last_action.timestamp;
+                this._status = data.status.state.toLowerCase();
+                this._networth = data.personalstats.networth;
+                this._losses = data.personalstats.defendslost;
+            })
     }
     
 }
@@ -231,282 +252,6 @@ let drawPlayers = function() {
 
 }
 
-let drawUI = function() {
-
-    let bar = $(`
-    <div class="mh-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10" >
-            <span class="">MugHunter</span>
-            <div class="mh-scan-indicator right"></div>
-        </div>
-        <div class="mh-filterbar bottom-round cont-gray" style="display: none;">
-            <div class="mh-filterTitle">
-                Filter options
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterJob">Job filter</label>
-                <select multiple="" class="form-control" id="mh-filterJob">
-                    <option>Surgeon</option>
-                    <option>Principal</option>
-                    <option>Federal</option>
-                    <option>General</option>
-                    <option>Manager</option>
-                    <option>President</option>
-                </select>
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterRank">Rank filter</label>
-                <select multiple="" class="form-control" id="mh-filterRank">
-                    <option>Investor</option>
-                    <option>Hoarder</option>
-                    <option>Tycoon</option>
-                </select>
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterScan">Loss threshold</label> 
-                <input type="textbox" id="mh-filterLosses" value="${opts.filters.losses.value}" />
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterScan">Activity threshold</label>
-                <input type="textbox" id="mh-filterLastOnline" value="${opts.filters.lastOnline.value}" />
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterNetworth">Networth threshold</label>
-                <input type="textbox" id="mh-filterNetworth" value="${opts.filters.networth.value}" />
-            </div>
-
-            <div class="mh-filterTitle">
-                Processing options
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-apiKey">API Key</label>
-                <input type="textbox" id="mh-apiKey" value="${opts.settings.apiKey}" />
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-filterScan">Scan</label>
-                <input type="checkbox" id="mh-filterScan" name="mh-filterScan" ${opts.settings.scan ? 'checked="checked"' : ''} />
-            </div>
-
-            <div class="mh-filterTitle">
-                Spoopy
-            </div>
-
-            <div class="mh-filterGroup">
-                <label for="mh-reset"></label>
-                <button id="mh-reset">RESET</button>
-                <button id="mh-clear">DELETE DATA</button>
-            </div>
-        </div>
-    </div>
-    
-    <div class="mh-player-wrapper">
-        <div class="mh-title-bar title-black top-round m-top10">
-            <span class="">Targets</span>
-        </div>
-        <div class="mh-filterbar bottom-round cont-gray">
-            <table class="mh-target-table display cell-border hover order-column row-border stripe">
-                <thead>
-                    <tr>
-                        <th class="tg-0lax">Name</th>
-                        <th class="tg-0lax">Id</th>
-                        <th class="tg-0lax">Losses</th>
-                        <th class="tg-0lax">Last Online</th>
-                        <th class="tg-0lax">Networth</th>
-                        <th class="tg-0lax">History</th>
-                    </tr>
-                </thead>
-                <tbody>
-                
-                </tbody>
-            </table>
-        </div>
-    </div>
-    `)
-
-    bar.find('#mh-filterJob').val(opts.filters.jobs.values)
-    bar.find('#mh-filterRank').val(opts.filters.ranks.values)
-    bar.find('.mh-title-bar').click(function() { $(this).siblings('.mh-filterbar').toggle() });
-    
-    bar.find('#mh-reset').click(() => {
-        log('RESET SETTINGS', true);
-        GM_setValue(PREFS_KEY, new Preferences())
-        loadOpts();
-    });
-
-    bar.find('#mh-clear').click(() => {
-        log('DELETE DATA', true);
-        players = new Array();
-        savePlayers();
-        loadOpts();
-    });
-    
-    bar.find('input, select').change(() => {
-        saveOpts();
-        if (opts.settings.scan) {
-            $('.pagination-wrap').first().find('a').last().click()
-        }
-    });
-    
-    bar.insertBefore('.userlist-wrapper');
-    
-    dataTable = $('.mh-target-table').DataTable({
-        columns: [
-            { "data": "name" },
-            { "data": "id" },
-            { "data": "losses" },
-            {
-                data: 'lastOnline',
-                render: function ( data, type, row ) {
-                    // If display or filter data is requested, format the date
-                    if ( type === 'display' || type === 'filter' ) {
-                        return Math.floor((new Date().getTime() / 1000 - data) / 60 /60 / 24) + " days ago"
-                    }
-             
-                    // Otherwise the data type requested (`type`) is type detection or
-                    // sorting data, for which we want to use the integer, so just return
-                    // that, unaltered
-                    return data;
-                }
-            },
-            {
-                data: 'networth',
-                render: function ( data, type, row ) {
-                    // If display or filter data is requested, format the date
-                    if ( type === 'display' || type === 'filter' ) {
-                        return formatCurrency(data)
-                    }
-             
-                    // Otherwise the data type requested (`type`) is type detection or
-                    // sorting data, for which we want to use the integer, so just return
-                    // that, unaltered
-                    return data;
-                }
-            },
-            { "data": "status" }
-        ]
-    })
-
-};
-
-let addStyles = function() {
-
-    var dataTablesStyles = GM_getResourceText ("dataTablesStyles");
-    GM_addStyle (dataTablesStyles);
-    GM_addStyle(`
-
-    .mh-filterbar {
-        height: auto!important;
-    }
-
-    .pagination-wrap {
-        display: none;
-    }
-
-    .mh-title-bar {
-        cursor: pointer;
-    }
-
-    .mh-scan-indicator {
-        margin-right: 10px;
-        border: 2px solid #575757;
-        width: 1em;
-        height: 1em;
-        margin-top: 0.5em;
-        border-radius: 1em;
-        background-color: #169ee4;
-    }
-
-    .mh-scan-indicator:hover {
-        background-color: #56adda;
-    }
-
-    .mh-scan-indicator span {
-        position: relative;
-        top: -10px;
-    }
-
-    .mh-filterbar.bottom-round.cont-gray {
-        padding: 10px;
-    }
-
-    .mh-filterTitle {
-        background-color: #ccc;
-        border-bottom: 3px solid #ddd;
-        border-radius: 2px;
-        padding: 6px;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-
-    .mh-filterGroup {
-        margin-bottom: 10px;
-        vertical-align: top;
-    }
-
-    .mh-filterGroup label {
-        line-height: 1.5em;
-        width: 140px;
-        display: inline-block;
-        text-align: right;
-        margin-right: 10px;
-        vertical-align: text-top;
-        padding: 1px;
-    }
-
-    .mh-filterGroup input[type=textbox] {
-        border: 1px solid #666;
-        padding-left: 6px;
-        width: 200px;
-        line-height: 1.5em;
-        vertical-align: text-top;
-        border-radius: 2px;
-    }
-
-    .mh-filterGroup input[type=checkbox] {
-        top: 4px;
-        position: relative;
-    }
-
-    .mh-filterGroup select {
-        border: 1px solid #666;
-        padding-left: 6px;
-        width: 200px;
-        line-height: 1.5em;
-        vertical-align: text-top;
-        border-radius: 2px;
-    }
-
-    .mh-target-table {
-        margin-top: 10px!important;
-    }
-
-    @media only screen and (max-width: 1000px) {
-
-        .mh-filterbar {
-        padding: 4px;
-        }
-
-        li.mh-data {
-            padding-left: 6px;
-        }
-
-        .mh-border-right {
-            border-right: 0px solid #ccc;
-            border-bottom: 2px solid #ccc;
-            margin-bottom: 3px;
-        }
-
-    }
-    `);
-
-};
 
 let preEnrichFilter = function(list) {
 
@@ -621,33 +366,12 @@ let addPlayer = function(player) {
 }
 
 
-let enrichPlayer = function(rawPLayer) {
-    return $.ajax('https://api.torn.com/user/' + rawPLayer.userID + '?selections=profile,personalstats&key=' + opts.settings.apiKey)
-            .success(data => {
-                data.player = {
-                    name: data.name,
-                    age: data.age,
-                    id: data.player_id,
-                    rank: data.rank.toLowerCase(),
-                    lastOnline: data.last_action.timestamp,
-                    status: data.status.state.toLowerCase(),
-                    networth: data.personalstats.networth,
-                    losses: data.personalstats.defendslost,
-                    job: rawPLayer.job,
-                    timestamp: Math.floor(new Date().getTime()/1000)
-                }
-            })
-}
-
 let processPlayers = function(rawList) {
 
     let processedList = [];
     let deferredList = [];
 
     rawList = preEnrichFilter(rawList);
-
-    log(`Rawlist: ${JSON.stringify(rawList)}`);
-    log(callCounter);
 
     // check if we can perform required api calls given current stack
     if (!callCounter.hasCapacity(rawList.length)) {
@@ -728,7 +452,6 @@ let init = function() {
 
     // piggyback off ajax completion events, check that it is for this page
     $( document ).ajaxComplete(function(event, resp, params) {
-        
         try {
             if (resp.status == 200) {
                 if (params.url.indexOf('https://www.torn.com/page.php') == 0) {
