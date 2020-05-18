@@ -49,7 +49,7 @@ class Counter {
             return ((new Date().getTime() - x) / 1000) < this.getExpiresIn()
         }));
 
-        // reccur until items are gone (lenght is 0) 
+        // reccur until items are gone (length is 0) 
         if (this.getStack().length > 0) {
             setTimeout(() => this.filterStack(), 1000);
         }
@@ -65,7 +65,7 @@ class Counter {
 }
 
 
-let   DEBUG_ON = false;
+let   DEBUG_ON = true;
 const PREFS_KEY = "storedPrefs";
 const PLAYERS_KEY = "storedPlayers";
 let   dataTable = null;
@@ -392,6 +392,11 @@ let drawUI = function() {
             { "data": "status" }
         ]
     })
+
+    
+    $('.mh-target-table tbody').on( 'click', 'tr', function () {
+        window.open(`profiles.php?XID=${dataTable.row( this ).data().id}`)
+    } );
 
 };
 
