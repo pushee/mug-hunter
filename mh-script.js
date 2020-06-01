@@ -88,7 +88,7 @@ class Preferences {
             this.filters = {
                 jobs: {
                     enabled: true,
-                    values: ['Surgeon', 'Principal', 'Federal']
+                    values: ['Brain Surgeon', 'Principal', 'Federal']
                 },
                 networth: {
                     enabled: true,
@@ -247,6 +247,7 @@ let drawUI = function() {
             <div class="mh-filterGroup">
                 <label for="mh-filterJob">Job filter</label>
                 <select multiple="" class="form-control" id="mh-filterJob">
+                    <option>Brain Surgeon</option>
                     <option>Surgeon</option>
                     <option>Principal</option>
                     <option>Federal</option>
